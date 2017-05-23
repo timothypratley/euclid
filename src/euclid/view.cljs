@@ -46,26 +46,29 @@
                    (swap! view-state assoc :center idx))))}])
 
 (defmethod draw-element :intersection [world view-state idx [_ {:keys [a b]}]]
-  (let [[x y] (model/intersection @world (@world a) (@world b))]
-    [:circle
-     {:r 1
-      :cx x
-      :cy y
-      :stroke "green"
-      :fill "green"
-      :on-click
-      (fn [e]
-        (.stopPropagation e)
-        (case (:action @view-state)
-          "point" nil
-          "line" (if-let [from (:from @view-state)]
-                   (do (swap! world model/add-line from idx)
-                       (swap! view-state dissoc :from))
-                   (swap! view-state assoc :from idx))
-          "circle" (if-let [center (:center @view-state)]
-                     (do (swap! world model/add-circle center idx)
-                         (swap! view-state dissoc :center))
-                     (swap! view-state assoc :center idx))))}]))
+  (let [coords (model/intersection @world (@world a) (@world b))]
+    (into
+      [:g]
+      (for [[x y] (partition 2 coords)]
+        [:circle
+         {:r 1
+          :cx x
+          :cy y
+          :stroke "green"
+          :fill "green"
+          :on-click
+          (fn [e]
+            (.stopPropagation e)
+            (case (:action @view-state)
+              "point" nil
+              "line" (if-let [from (:from @view-state)]
+                       (do (swap! world model/add-line from idx)
+                           (swap! view-state dissoc :from))
+                       (swap! view-state assoc :from idx))
+              "circle" (if-let [center (:center @view-state)]
+                         (do (swap! world model/add-circle center idx)
+                             (swap! view-state dissoc :center))
+                         (swap! view-state assoc :center idx))))}]))))
 
 
 (defmethod draw-element :line [world view-state idx [_ {:keys [from to]}]]
@@ -90,7 +93,11 @@
       :r (model/distance cx cy x2 y2)
       :on-click
       (fn [e]
-        (.stopPropagation e))}]))
+        (.stopPropagation e)
+        (if-let [intersects (:intersects @view-state)]
+          (do (swap! world model/add-intersection intersects idx)
+              (swap! view-state dissoc :intersects))
+          (swap! view-state assoc :intersects idx)))}]))
 
 (defn order-by-z-index [world elements]
   (map
@@ -138,7 +145,7 @@
      :value "point"
      :default-checked "true"
      :on-click (fn [e]
-                  (reset! view-state {:action "point"}))}]
+                 (reset! view-state {:action "point"}))}]
    "Add point"
    [:br]
    [:input
@@ -146,7 +153,7 @@
      :name "action"
      :value "line"
      :on-click (fn [e]
-                  (reset! view-state {:action "line"}))}]
+                 (reset! view-state {:action "line"}))}]
    "Add line"
    (when-let [from (:from @view-state)]
      (str " from " from))
@@ -156,7 +163,7 @@
      :name "action"
      :value "circle"
      :on-click (fn [e]
-                  (reset! view-state {:action "circle"}))}]
+                 (reset! view-state {:action "circle"}))}]
    "Add circle"
    (when-let [center (:center @view-state)]
      (str " center " center))
